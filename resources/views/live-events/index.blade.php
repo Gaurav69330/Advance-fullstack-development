@@ -89,7 +89,12 @@
         .search-fields {
             display: grid;
             grid-template-columns: 2fr 1.5fr 1fr;
+            align-items: start;
             gap: 16px;
+        }
+
+        .search-fields > div {
+            min-width: 0;
         }
 
         label {
@@ -155,6 +160,10 @@
             align-items: center;
             gap: 18px;
             margin-top: 18px;
+        }
+
+        .search-suggestions a {
+            overflow-wrap: anywhere;
         }
 
         .error,
@@ -261,6 +270,10 @@
         :focus-visible {
             outline: 3px solid #637c26;
             outline-offset: 4px;
+        }
+
+        [hidden] {
+            display: none !important;
         }
 
         @media (max-width: 950px) {
@@ -421,7 +434,15 @@
                         value="{{ $keyword }}"
                         maxlength="100"
                         placeholder="Search an artist or event"
+                        autocomplete="off"
+                        aria-describedby="suggestions-hint"
+                        data-suggestions-url="{{ route('search-suggestions.index') }}"
                     >
+
+                    <p class="hint" id="suggestions-hint">
+                        Suggestions show upcoming saved gigs.
+                        Submit your search to find Ticketmaster listings.
+                    </p>
                 </div>
 
                 <div>
@@ -765,71 +786,84 @@
     </footer>
 
     <script>
-        const searchForm = document.getElementById('live-search-form');
+        (() => {
+            const searchForm =
+                document.getElementById('live-search-form');
 
-        if (searchForm) {
-            searchForm.addEventListener('submit', () => {
-                const button = document.getElementById('search-button');
-                const status = document.getElementById('search-status');
+            if (searchForm) {
+                searchForm.addEventListener('submit', () => {
+                    const button =
+                        document.getElementById('search-button');
 
-                button.disabled = true;
-                button.textContent = 'Searching…';
-                status.textContent = 'Searching Ticketmaster. Please wait.';
-            });
+                    const status =
+                        document.getElementById('search-status');
 
-            function clearNearbyLocation() {
-                ['latitude', 'longitude', 'radius'].forEach((name) => {
-                    searchForm.querySelector(
-                        `input[name="${name}"]`
-                    )?.remove();
+                    button.disabled = true;
+                    button.textContent = 'Searching…';
+
+                    status.textContent =
+                        'Searching Ticketmaster. Please wait.';
                 });
 
-                document.getElementById('location-status').textContent =
-                    'Place search selected. Click Near me to use your location.';
+                function clearNearbyLocation() {
+                    ['latitude', 'longitude', 'radius'].forEach((name) => {
+                        searchForm.querySelector(
+                            `input[name="${name}"]`
+                        )?.remove();
+                    });
+
+                    document.getElementById('location-status')
+                        .textContent =
+                            'Place search selected. Click Near me to use your location.';
+                }
+
+                document.getElementById('city')
+                    .addEventListener('input', clearNearbyLocation);
+
+                document.getElementById('country_code')
+                    .addEventListener('input', clearNearbyLocation);
             }
 
-            document.getElementById('city')
-                .addEventListener('input', clearNearbyLocation);
+            document.querySelectorAll('.save-event-form')
+                .forEach((form) => {
+                    form.addEventListener('submit', () => {
+                        const button = form.querySelector('button');
 
-            document.getElementById('country_code')
-                .addEventListener('input', clearNearbyLocation);
-        }
-
-        document.querySelectorAll('.save-event-form').forEach((form) => {
-            form.addEventListener('submit', () => {
-                const button = form.querySelector('button');
-
-                button.disabled = true;
-                button.textContent = 'Saving…';
-            });
-        });
-
-        window.addEventListener('pageshow', () => {
-            const searchButton = document.getElementById('search-button');
-
-            if (searchButton) {
-                searchButton.disabled = false;
-                searchButton.textContent = 'Search live events →';
-            }
-
-            const nearMeButton = document.getElementById('near-me-button');
-
-            if (nearMeButton) {
-                nearMeButton.disabled = false;
-                nearMeButton.textContent = 'Near me';
-            }
-
-            document.querySelectorAll('.save-event-form button')
-                .forEach((button) => {
-                    button.disabled = false;
-                    button.textContent = 'Save to GigPulse →';
+                        button.disabled = true;
+                        button.textContent = 'Saving…';
+                    });
                 });
 
-            document.getElementById('search-status').textContent = '';
-        });
+            window.addEventListener('pageshow', () => {
+                const searchButton =
+                    document.getElementById('search-button');
+
+                if (searchButton) {
+                    searchButton.disabled = false;
+                    searchButton.textContent = 'Search live events →';
+                }
+
+                const nearMeButton =
+                    document.getElementById('near-me-button');
+
+                if (nearMeButton) {
+                    nearMeButton.disabled = false;
+                    nearMeButton.textContent = 'Near me';
+                }
+
+                document.querySelectorAll('.save-event-form button')
+                    .forEach((button) => {
+                        button.disabled = false;
+                        button.textContent = 'Save to GigPulse →';
+                    });
+
+                document.getElementById('search-status').textContent = '';
+            });
+        })();
     </script>
 
     <script src="{{ asset('js/near-me.js') }}" defer></script>
     <script src="{{ asset('js/search-preferences.js') }}" defer></script>
+    <script src="{{ asset('js/search-suggestions.js') }}" defer></script>
 </body>
 </html>
