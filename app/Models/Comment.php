@@ -1,0 +1,37 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class Comment extends Model
+{
+    protected $table = 'comments';
+
+    protected $primaryKey = 'comment_id';
+
+    protected $fillable = [
+        'user_id',
+        'event_id',
+        'body',
+    ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(
+            User::class,
+            'user_id',
+            'id'
+        );
+    }
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(
+            Event::class,
+            'event_id',
+            'event_id'
+        );
+    }
+}
