@@ -62,7 +62,8 @@ class ReviewController extends Controller
                     'rating' => $review->rating,
                     'comment' => $review->comment,
                     'author' => $request->user()->name,
-                    'updated_at' => $review->updated_at->toIso8601String(),
+                    'updated_at' => $review->updated_at
+                        ->toIso8601String(),
                 ],
             ]);
         }
@@ -70,5 +71,32 @@ class ReviewController extends Controller
         return redirect()
             ->route('events.show', $event)
             ->with('success', 'Your review has been saved.');
+    }
+
+    public function destroy(
+        Request $request,
+        Review $review
+    ): JsonResponse|RedirectResponse {
+        abort_unless(
+            $request->user()
+            && (int) $review->user_id
+                === (int) $request->user()->id,
+            403,
+            'You can only delete your own review.'
+        );
+
+        $eventId = $review->event_id;
+
+        $review->delete();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Your review has been deleted.',
+            ]);
+        }
+
+        return redirect()
+            ->route('events.show', $eventId)
+            ->with('success', 'Your review has been deleted.');
     }
 }

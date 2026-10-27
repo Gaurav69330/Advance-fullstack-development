@@ -23,42 +23,6 @@
             color: inherit;
         }
 
-        header {
-            padding: 20px 6%;
-            border-bottom: 1px solid #d9dccf;
-        }
-
-        .header-content,
-        .navigation,
-        .badges {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .header-content {
-            justify-content: space-between;
-        }
-
-        .brand {
-            font-size: 28px;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-        .brand span {
-            color: #637c26;
-        }
-
-        .navigation {
-            font-size: 14px;
-        }
-
-        .navigation form {
-            margin: 0;
-        }
-
         main {
             max-width: 1000px;
             margin: auto;
@@ -78,6 +42,8 @@
         }
 
         .badges {
+            display: flex;
+            flex-wrap: wrap;
             gap: 8px;
         }
 
@@ -132,6 +98,13 @@
             font-weight: bold;
         }
 
+        .details .timezone {
+            margin-top: 5px;
+            font-size: 13px;
+            font-weight: normal;
+            color: #686b60;
+        }
+
         .notice,
         .panel {
             padding: 24px;
@@ -145,14 +118,14 @@
             font-size: 13px;
         }
 
-        label {
+        .panel label {
             display: block;
             margin-bottom: 8px;
             font-weight: bold;
         }
 
-        select,
-        input[type="file"] {
+        .panel select,
+        .panel input[type="file"] {
             display: block;
             width: 100%;
             max-width: 450px;
@@ -165,7 +138,7 @@
             font: inherit;
         }
 
-        button,
+        .panel button,
         .button {
             display: inline-block;
             min-height: 44px;
@@ -179,12 +152,12 @@
             cursor: pointer;
         }
 
-        button:hover,
+        .panel button:hover,
         .button:hover {
             background: #344b38;
         }
 
-        button:disabled {
+        .panel button:disabled {
             opacity: 0.6;
             cursor: wait;
         }
@@ -239,7 +212,7 @@
         }
 
         [hidden] {
-            display: none;
+            display: none !important;
         }
 
         @media (max-width: 600px) {
@@ -255,17 +228,12 @@
                 grid-template-columns: 1fr;
             }
 
-            .header-content {
-                flex-direction: column;
-                align-items: start;
-            }
-
             .panel {
                 padding: 20px;
             }
 
-            select,
-            input[type="file"],
+            .panel select,
+            .panel input[type="file"],
             .panel form button {
                 width: 100%;
                 max-width: none;
@@ -275,6 +243,8 @@
 </head>
 
 <body>
+    @include('partials.header')
+
     @php
         $attendance = auth()->check()
             ? $event->attendances()
@@ -292,37 +262,30 @@
         $attendanceCount = $event->attendances()
             ->where('status', 'Attending')
             ->count();
+
+        $venueTimezone = $event->venue?->timezone;
+
+        $validTimezones = \DateTimeZone::listIdentifiers(
+            \DateTimeZone::ALL_WITH_BC
+        );
+
+        $hasVenueTimezone = is_string($venueTimezone)
+            && in_array($venueTimezone, $validTimezones, true);
+
+        $displayTimezone = $hasVenueTimezone
+            ? $venueTimezone
+            : 'UTC';
+
+        $localEventDate = $event->event_date
+            ->copy()
+            ->setTimezone($displayTimezone);
+
+        $ticketUrl = $event->ticket_url;
+
+        $validTicketUrl = is_string($ticketUrl)
+            && filter_var($ticketUrl, FILTER_VALIDATE_URL)
+            && parse_url($ticketUrl, PHP_URL_SCHEME) === 'https';
     @endphp
-
-    <header>
-        <div class="header-content">
-            <a class="brand" href="{{ route('events.index') }}">
-                Gig<span>Pulse</span>
-            </a>
-
-            <nav class="navigation" aria-label="Main navigation">
-                <a href="{{ route('events.index') }}">Discover</a>
-
-                <a href="{{ route('saved-events.index') }}">
-                    Saved listings
-                </a>
-
-                @auth
-                    <a href="{{ route('my-gigs.index') }}">My gigs</a>
-
-                    <span>Hello, {{ auth()->user()->name }}</span>
-
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button type="submit">Sign out</button>
-                    </form>
-                @else
-                    <a href="{{ route('login') }}">Sign in</a>
-                    <a href="{{ route('register') }}">Register</a>
-                @endauth
-            </nav>
-        </div>
-    </header>
 
     <main>
         <a class="back-link" href="{{ route('events.index') }}">
@@ -371,20 +334,31 @@
             <dl class="details">
                 <div>
                     <dt>Date</dt>
+
                     <dd>
-                        {{ $event->event_date->format('l, j F Y') }}
+                        <time datetime="{{ $localEventDate->toIso8601String() }}">
+                            {{ $localEventDate->format('l, j F Y') }}
+                        </time>
                     </dd>
                 </div>
 
                 <div>
-                    <dt>Time ({{ config('app.timezone', 'UTC') }})</dt>
+                    <dt>
+                        {{ $hasVenueTimezone ? 'Venue local time' : 'Time (UTC)' }}
+                    </dt>
+
                     <dd>
-                        {{ $event->event_date->format('H:i') }}
+                        {{ $localEventDate->format('H:i') }}
+                    </dd>
+
+                    <dd class="timezone">
+                        {{ $displayTimezone }}
                     </dd>
                 </div>
 
                 <div>
                     <dt>Venue</dt>
+
                     <dd>
                         {{ $event->venue?->name ?? 'To be confirmed' }}
                     </dd>
@@ -392,6 +366,7 @@
 
                 <div>
                     <dt>Location</dt>
+
                     <dd>
                         {{ $event->venue?->city ?? 'To be confirmed' }}
 
@@ -401,6 +376,26 @@
                     </dd>
                 </div>
             </dl>
+
+            @if (!$hasVenueTimezone)
+                <p class="hint">
+                    The venue timezone is unavailable, so this event
+                    displays in UTC.
+                </p>
+            @endif
+
+            @if ($validTicketUrl)
+                <p>
+                    <a
+                        class="button"
+                        href="{{ $ticketUrl }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Tickets on Ticketmaster ↗
+                    </a>
+                </p>
+            @endif
 
             @if ($event->event_date->isPast())
                 <p class="notice">
@@ -542,23 +537,7 @@
                             >
                         </div>
 
-                        <div class="photo-choice">
-                            <label for="photo-camera">
-                                Or take a photo
-                            </label>
-
-                            <input
-                                id="photo-camera"
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp"
-                                capture="environment"
-                            >
-
-                            <p class="hint">
-                                Supported phones may open the rear camera.
-                                Other devices may show a file picker.
-                            </p>
-                        </div>
+                        @include('events.camera')
 
                         <p
                             id="photo-feedback"
@@ -580,8 +559,9 @@
                 </section>
             @endauth
 
-            @include('events.reviews')
             @include('events.comments')
+
+            @include('events.reviews')
         </article>
     </main>
 
@@ -696,10 +676,29 @@
                 preview.removeAttribute('src');
             }
 
+            function validatePhoto(file) {
+                const allowedTypes = [
+                    'image/jpeg',
+                    'image/png',
+                    'image/webp',
+                ];
+
+                if (!allowedTypes.includes(file.type)) {
+                    return 'Choose a JPEG, PNG, or WebP photo.';
+                }
+
+                if (file.size > 5 * 1024 * 1024) {
+                    return 'Your photo must be 5 MB or smaller.';
+                }
+
+                return null;
+            }
+
             function selectPhoto(activeInput, otherInput) {
                 const file = activeInput.files[0];
 
                 clearPreview();
+
                 otherInput.value = '';
                 otherInput.removeAttribute('name');
                 activeInput.name = 'photo';
@@ -710,24 +709,11 @@
                     return;
                 }
 
-                const allowedTypes = [
-                    'image/jpeg',
-                    'image/png',
-                    'image/webp',
-                ];
+                const error = validatePhoto(file);
 
-                if (!allowedTypes.includes(file.type)) {
+                if (error) {
                     activeInput.value = '';
-                    feedback.textContent =
-                        'Choose a JPEG, PNG, or WebP photo.';
-                    feedback.className = 'feedback error';
-                    return;
-                }
-
-                if (file.size > 5 * 1024 * 1024) {
-                    activeInput.value = '';
-                    feedback.textContent =
-                        'Your photo must be 5 MB or smaller.';
+                    feedback.textContent = error;
                     feedback.className = 'feedback error';
                     return;
                 }
@@ -755,16 +741,17 @@
 
                 const file = activeInput.files[0];
 
-                if (!file) {
-                    event.preventDefault();
+                const error = file
+                    ? validatePhoto(file)
+                    : 'Choose or take a photo before saving.';
 
-                    feedback.textContent =
-                        'Choose or take a photo before saving.';
+                if (error) {
+                    event.preventDefault();
+                    feedback.textContent = error;
                     feedback.className = 'feedback error';
                     return;
                 }
 
-                // Submit exactly one photo field.
                 fileInput.removeAttribute('name');
                 cameraInput.removeAttribute('name');
                 activeInput.name = 'photo';

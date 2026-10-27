@@ -23,41 +23,6 @@
             color: inherit;
         }
 
-        header {
-            padding: 20px 6%;
-            border-bottom: 1px solid #d9dccf;
-        }
-
-        .header-content {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .brand {
-            font-size: 28px;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-        .brand span {
-            color: #637c26;
-        }
-
-        .account-nav {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 18px;
-            font-size: 14px;
-        }
-
-        .account-nav form {
-            margin: 0;
-        }
-
         main {
             max-width: 1200px;
             margin: auto;
@@ -70,9 +35,17 @@
             line-height: 1.1;
         }
 
-        .intro {
+        .intro,
+        .hint {
             color: #686b60;
+        }
+
+        .intro {
             margin-bottom: 30px;
+        }
+
+        .hint {
+            font-size: 13px;
         }
 
         .cards {
@@ -108,14 +81,8 @@
 
         .card p {
             margin: 6px 0;
-            color: #686b60;
         }
 
-        .past-label {
-            font-size: 13px;
-        }
-
-        button,
         .button {
             display: inline-block;
             min-height: 44px;
@@ -126,16 +93,18 @@
             color: white;
             font: inherit;
             text-decoration: none;
-            cursor: pointer;
         }
 
-        button:hover,
         .button:hover {
             background: #344b38;
         }
 
         .card .button {
-            margin-top: 20px;
+            margin-top: auto;
+        }
+
+        .card-details {
+            margin-bottom: 22px;
         }
 
         .empty {
@@ -143,10 +112,6 @@
             border: 1px dashed #a6b18d;
             border-radius: 8px;
             text-align: center;
-        }
-
-        .empty p {
-            color: #686b60;
         }
 
         .success-message {
@@ -163,23 +128,6 @@
             justify-content: space-between;
             gap: 16px;
             margin-top: 30px;
-        }
-
-        .pagination a,
-        .pagination span {
-            display: inline-block;
-            padding: 10px 16px;
-            border: 1px solid #d9dccf;
-            border-radius: 5px;
-            text-decoration: none;
-        }
-
-        .pagination a {
-            background: #fffef9;
-        }
-
-        .pagination a:hover {
-            background: #e8ecdf;
         }
 
         footer {
@@ -205,11 +153,6 @@
                 grid-template-columns: 1fr;
             }
 
-            .header-content {
-                flex-direction: column;
-                align-items: start;
-            }
-
             main {
                 padding: 30px 18px;
             }
@@ -218,32 +161,13 @@
 </head>
 
 <body>
-    <header>
-        <div class="header-content">
-            <a class="brand" href="{{ route('events.index') }}">
-                Gig<span>Pulse</span>
-            </a>
+    @include('partials.header')
 
-            <nav class="account-nav" aria-label="Main navigation">
-                <a href="{{ route('events.index') }}">Discover</a>
-
-                <a
-                    href="{{ route('my-gigs.index') }}"
-                    aria-current="page"
-                >
-                    My gigs
-                </a>
-
-                <span>Hello, {{ auth()->user()->name }}</span>
-
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-
-                    <button type="submit">Sign out</button>
-                </form>
-            </nav>
-        </div>
-    </header>
+    @php
+        $validTimezones = \DateTimeZone::listIdentifiers(
+            \DateTimeZone::ALL_WITH_BC
+        );
+    @endphp
 
     <main>
         @if (session('success'))
@@ -268,7 +192,7 @@
                 <h2>Your next good night is waiting.</h2>
 
                 <p>
-                    Open a gig and save it as Interested or Attending.
+                    Find an event on Discover and select Save to GigPulse.
                     It will appear here.
                 </p>
 
@@ -279,49 +203,107 @@
         @else
             <div class="cards">
                 @foreach ($attendances as $attendance)
-                    <article class="card">
-                        <span class="status">
-                            {{ $attendance->status }}
-                        </span>
+                    @php
+                        $gig = $attendance->event;
 
-                        <h2>{{ $attendance->event->artist_name }}</h2>
+                        $venueTimezone = $gig?->venue?->timezone;
 
-                        <p>
-                            <strong>When:</strong>
+                        $hasVenueTimezone = is_string($venueTimezone)
+                            && in_array(
+                                $venueTimezone,
+                                $validTimezones,
+                                true
+                            );
 
-                            <time datetime="{{ $attendance->event->event_date->toIso8601String() }}">
-                                {{ $attendance->event->event_date->format('D, j M Y · H:i') }}
-                            </time>
-                        </p>
+                        $displayTimezone = $hasVenueTimezone
+                            ? $venueTimezone
+                            : 'UTC';
 
-                        <p>
-                            <strong>Venue:</strong>
-                            {{ $attendance->event->venue?->name ?? 'To be confirmed' }}
-                        </p>
+                        $localEventDate = $gig?->event_date
+                            ? $gig->event_date
+                                ->copy()
+                                ->setTimezone($displayTimezone)
+                            : null;
+                    @endphp
 
-                        <p>
-                            <strong>City:</strong>
-                            {{ $attendance->event->venue?->city ?? 'To be confirmed' }}
-                        </p>
+                    @if ($gig && $localEventDate)
+                        <article class="card">
+                            <span class="status">
+                                {{ $attendance->status }}
+                            </span>
 
-                        @if ($attendance->event->event_date->isPast())
-                            <p class="past-label">
-                                This event has taken place.
-                            </p>
-                        @else
-                            <p class="past-label">
-                                An upcoming night out.
-                            </p>
-                        @endif
+                            <h2>{{ $gig->artist_name }}</h2>
 
-                        <a
-                            class="button"
-                            href="{{ route('events.show', $attendance->event) }}"
-                            aria-label="View gig: {{ $attendance->event->artist_name }}"
-                        >
-                            View gig →
-                        </a>
-                    </article>
+                            <div class="card-details">
+                                @if ($gig->is_demo)
+                                    <p class="hint">
+                                        Fictional sample gig
+                                    </p>
+                                @endif
+
+                                <p>
+                                    <strong>Date:</strong>
+
+                                    <time datetime="{{ $localEventDate->toIso8601String() }}">
+                                        {{ $localEventDate->format('D, j M Y') }}
+                                    </time>
+                                </p>
+
+                                <p>
+                                    <strong>
+                                        {{ $hasVenueTimezone
+                                            ? 'Venue local time:'
+                                            : 'Time (UTC):' }}
+                                    </strong>
+
+                                    {{ $localEventDate->format('H:i') }}
+                                </p>
+
+                                <p class="hint">
+                                    {{ $displayTimezone }}
+                                </p>
+
+                                <p>
+                                    <strong>Venue:</strong>
+                                    {{ $gig->venue?->name ?? 'To be confirmed' }}
+                                </p>
+
+                                <p>
+                                    <strong>City:</strong>
+                                    {{ $gig->venue?->city ?? 'To be confirmed' }}
+
+                                    @if ($gig->venue?->country_code)
+                                        · {{ $gig->venue->country_code }}
+                                    @endif
+                                </p>
+
+                                @if ($gig->event_date->isPast())
+                                    <p class="hint">
+                                        This event has taken place.
+                                        Reviews are open.
+                                    </p>
+                                @else
+                                    <p class="hint">
+                                        An upcoming night out.
+                                    </p>
+                                @endif
+
+                                @if ($attendance->ticket_photo_path)
+                                    <p class="hint">
+                                        You have saved a photo for this gig.
+                                    </p>
+                                @endif
+                            </div>
+
+                            <a
+                                class="button"
+                                href="{{ route('events.show', $gig) }}"
+                                aria-label="View gig: {{ $gig->artist_name }}"
+                            >
+                                View gig →
+                            </a>
+                        </article>
+                    @endif
                 @endforeach
             </div>
         @endif
@@ -331,7 +313,11 @@
                 @if ($attendances->onFirstPage())
                     <span aria-disabled="true">← Previous</span>
                 @else
-                    <a href="{{ $attendances->previousPageUrl() }}" rel="prev">
+                    <a
+                        class="button"
+                        href="{{ $attendances->previousPageUrl() }}"
+                        rel="prev"
+                    >
                         ← Previous
                     </a>
                 @endif
@@ -342,7 +328,11 @@
                 </span>
 
                 @if ($attendances->hasMorePages())
-                    <a href="{{ $attendances->nextPageUrl() }}" rel="next">
+                    <a
+                        class="button"
+                        href="{{ $attendances->nextPageUrl() }}"
+                        rel="next"
+                    >
                         Next →
                     </a>
                 @else

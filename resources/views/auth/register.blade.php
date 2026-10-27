@@ -19,22 +19,6 @@
             line-height: 1.6;
         }
 
-        header {
-            padding: 20px 6%;
-            border-bottom: 1px solid #d9dccf;
-        }
-
-        .brand {
-            color: #20231e;
-            font-size: 28px;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-        .brand span {
-            color: #637c26;
-        }
-
         main {
             max-width: 480px;
             margin: 50px auto;
@@ -59,14 +43,14 @@
             color: #686b60;
         }
 
-        label {
+        .card label {
             display: block;
             margin-top: 18px;
             font-size: 14px;
             font-weight: bold;
         }
 
-        input {
+        .card input {
             display: block;
             width: 100%;
             min-height: 46px;
@@ -75,14 +59,15 @@
             border: 1px solid #c8cdbd;
             border-radius: 5px;
             background: white;
+            color: #20231e;
             font: inherit;
         }
 
-        input[aria-invalid="true"] {
+        .card input[aria-invalid="true"] {
             border-color: #a83232;
         }
 
-        button {
+        .submit-button {
             width: 100%;
             min-height: 46px;
             margin-top: 25px;
@@ -96,7 +81,7 @@
             cursor: pointer;
         }
 
-        button:hover {
+        .submit-button:hover {
             background: #344b38;
         }
 
@@ -117,7 +102,7 @@
             font-size: 14px;
         }
 
-        a {
+        .card a {
             color: #435d21;
         }
 
@@ -139,11 +124,7 @@
 </head>
 
 <body>
-    <header>
-        <a class="brand" href="{{ route('events.index') }}">
-            Gig<span>Pulse</span>
-        </a>
-    </header>
+    @include('partials.header')
 
     <main>
         <section class="card" aria-labelledby="register-heading">
@@ -168,7 +149,9 @@
                     required
                     autofocus
                     aria-invalid="{{ $errors->has('name') ? 'true' : 'false' }}"
-                    @error('name') aria-describedby="name-error" @enderror
+                    @error('name')
+                        aria-describedby="name-error"
+                    @enderror
                 >
 
                 @error('name')
@@ -188,7 +171,9 @@
                     autocomplete="email"
                     required
                     aria-invalid="{{ $errors->has('email') ? 'true' : 'false' }}"
-                    @error('email') aria-describedby="email-error" @enderror
+                    @error('email')
+                        aria-describedby="email-error"
+                    @enderror
                 >
 
                 @error('email')
@@ -233,9 +218,25 @@
                     maxlength="72"
                     autocomplete="new-password"
                     required
+                    aria-invalid="{{ $errors->has('password_confirmation') ? 'true' : 'false' }}"
+                    @error('password_confirmation')
+                        aria-describedby="password-confirmation-error"
+                    @enderror
                 >
 
-                <button type="submit">Create account →</button>
+                @error('password_confirmation')
+                    <p
+                        class="error"
+                        id="password-confirmation-error"
+                        role="alert"
+                    >
+                        {{ $message }}
+                    </p>
+                @enderror
+
+                <button class="submit-button" type="submit">
+                    Create account →
+                </button>
             </form>
 
             <p class="login-link">

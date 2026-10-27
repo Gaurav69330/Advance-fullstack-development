@@ -18,6 +18,7 @@ class Venue extends Model
         'latitude',
         'longitude',
         'ticketmaster_id',
+        'timezone',
     ];
 
     protected $casts = [

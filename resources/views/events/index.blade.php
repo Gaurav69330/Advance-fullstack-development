@@ -23,37 +23,6 @@
             color: inherit;
         }
 
-        header {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-            padding: 20px 6%;
-            border-bottom: 1px solid #d9dccf;
-        }
-
-        .brand {
-            font-size: 28px;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-        .brand span {
-            color: #637c26;
-        }
-
-        nav {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 18px;
-        }
-
-        nav form {
-            margin: 0;
-        }
-
         main {
             max-width: 1200px;
             margin: auto;
@@ -95,10 +64,11 @@
             border: 1px solid #bbc5a8;
             border-radius: 5px;
             background: white;
+            color: #20231e;
             font: inherit;
         }
 
-        button,
+        .filter-button,
         .button {
             display: inline-block;
             min-height: 44px;
@@ -112,6 +82,11 @@
             cursor: pointer;
         }
 
+        .filter-button:hover,
+        .button:hover {
+            background: #344b38;
+        }
+
         .cards {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -119,6 +94,9 @@
         }
 
         .card {
+            display: flex;
+            flex-direction: column;
+            align-items: start;
             padding: 24px;
             border: 1px solid #d9dccf;
             border-radius: 8px;
@@ -130,12 +108,29 @@
             overflow-wrap: anywhere;
         }
 
+        .card p {
+            margin: 6px 0;
+        }
+
+        .card-details {
+            margin-bottom: 22px;
+        }
+
+        .card .button {
+            margin-top: auto;
+        }
+
         .badge {
             display: inline-block;
             padding: 4px 10px;
             border-radius: 20px;
             background: #d8f36a;
             font-size: 12px;
+        }
+
+        .hint {
+            color: #686b60;
+            font-size: 13px;
         }
 
         .empty,
@@ -163,6 +158,7 @@
             padding: 24px;
             border-top: 1px solid #d9dccf;
             text-align: center;
+            color: #686b60;
         }
 
         :focus-visible {
@@ -184,38 +180,22 @@
             .filters > * {
                 width: 100%;
             }
+
+            main {
+                padding: 30px 18px;
+            }
         }
     </style>
 </head>
 
 <body>
-    <header>
-        <a class="brand" href="{{ route('events.index') }}">
-            Gig<span>Pulse</span>
-        </a>
+    @include('partials.header')
 
-        <nav aria-label="Main navigation">
-            <a href="{{ route('events.index') }}">Discover</a>
-
-            <a
-                href="{{ route('saved-events.index') }}"
-                aria-current="page"
-            >
-                Saved listings
-            </a>
-
-            @auth
-                <a href="{{ route('my-gigs.index') }}">My gigs</a>
-
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button type="submit">Sign out</button>
-                </form>
-            @else
-                <a href="{{ route('login') }}">Sign in</a>
-            @endauth
-        </nav>
-    </header>
+    @php
+        $validTimezones = \DateTimeZone::listIdentifiers(
+            \DateTimeZone::ALL_WITH_BC
+        );
+    @endphp
 
     <main>
         <h1>Saved event listings</h1>
@@ -228,6 +208,12 @@
         @if (session('success'))
             <p class="message" role="status">
                 {{ session('success') }}
+            </p>
+        @endif
+
+        @if (session('error'))
+            <p class="message error" role="alert">
+                {{ session('error') }}
             </p>
         @endif
 
@@ -245,6 +231,7 @@
             class="filters"
             method="GET"
             action="{{ route('saved-events.index') }}"
+            role="search"
         >
             <div class="search-field">
                 <label for="search">Artist, venue, or city</label>
@@ -303,63 +290,118 @@
                 </select>
             </div>
 
-            <button type="submit">Apply filters</button>
+            <button class="filter-button" type="submit">
+                Apply filters
+            </button>
 
             <a href="{{ route('saved-events.index') }}">
                 Clear filters
             </a>
         </form>
 
-        <p>{{ $events->total() }} matching saved gigs</p>
+        <p>
+            {{ $events->total() }}
+            {{ $events->total() === 1
+                ? 'matching saved gig'
+                : 'matching saved gigs' }}
+        </p>
 
         @if ($events->isEmpty())
             <section class="empty">
                 <h2>No matching gigs are stored yet.</h2>
 
                 <p>
-                    Try All gigs or clear your search and genre filters.
-                    Past events must exist in the database to appear here.
+                    Try All gigs, clear your filters,
+                    or save an event from Discover.
                 </p>
+
+                <a class="button" href="{{ route('events.index') }}">
+                    Discover gigs →
+                </a>
             </section>
         @else
             <div class="cards">
                 @foreach ($events as $event)
+                    @php
+                        $venueTimezone = $event->venue?->timezone;
+
+                        $hasVenueTimezone = is_string($venueTimezone)
+                            && in_array(
+                                $venueTimezone,
+                                $validTimezones,
+                                true
+                            );
+
+                        $displayTimezone = $hasVenueTimezone
+                            ? $venueTimezone
+                            : 'UTC';
+
+                        $localEventDate = $event->event_date
+                            ->copy()
+                            ->setTimezone($displayTimezone);
+                    @endphp
+
                     <article class="card">
                         <span class="badge">
                             {{ $event->genre ?: 'Live music' }}
                         </span>
 
-                        @if ($event->is_demo)
-                            <p><small>Fictional sample gig</small></p>
-                        @endif
-
                         <h2>{{ $event->artist_name }}</h2>
 
-                        <p>
-                            <strong>Date:</strong>
-                            {{ $event->event_date->format('D, j M Y · H:i') }}
-                            ({{ config('app.timezone', 'UTC') }})
-                        </p>
+                        <div class="card-details">
+                            @if ($event->is_demo)
+                                <p class="hint">
+                                    Fictional sample gig
+                                </p>
+                            @endif
 
-                        <p>
-                            <strong>Venue:</strong>
-                            {{ $event->venue?->name ?? 'To be confirmed' }}
-                        </p>
+                            <p>
+                                <strong>Date:</strong>
 
-                        <p>
-                            <strong>City:</strong>
-                            {{ $event->venue?->city ?? 'To be confirmed' }}
-                        </p>
+                                <time datetime="{{ $localEventDate->toIso8601String() }}">
+                                    {{ $localEventDate->format('D, j M Y') }}
+                                </time>
+                            </p>
 
-                        <p>
-                            {{ $event->event_date->isPast()
-                                ? 'Past gig — reviews are open.'
-                                : 'Upcoming gig.' }}
-                        </p>
+                            <p>
+                                <strong>
+                                    {{ $hasVenueTimezone
+                                        ? 'Venue local time:'
+                                        : 'Time (UTC):' }}
+                                </strong>
+
+                                {{ $localEventDate->format('H:i') }}
+                            </p>
+
+                            <p class="hint">
+                                {{ $displayTimezone }}
+                            </p>
+
+                            <p>
+                                <strong>Venue:</strong>
+                                {{ $event->venue?->name ?? 'To be confirmed' }}
+                            </p>
+
+                            <p>
+                                <strong>City:</strong>
+                                {{ $event->venue?->city ?? 'To be confirmed' }}
+
+                                @if ($event->venue?->country_code)
+                                    · {{ $event->venue->country_code }}
+                                @endif
+                            </p>
+
+                            <p class="hint">
+                                {{ $event->event_date->isPast()
+                                    ? 'Past gig — reviews are open.'
+                                    : 'Upcoming gig.' }}
+                            </p>
+                        </div>
 
                         <a
                             class="button"
                             href="{{ route('events.show', $event) }}"
+                            aria-label="View gig: {{ $event->artist_name }}"
                         >
                             View gig →
                         </a>
@@ -370,8 +412,14 @@
 
         @if ($events->hasPages())
             <nav class="pagination" aria-label="Event pages">
-                @if (!$events->onFirstPage())
-                    <a class="button" href="{{ $events->previousPageUrl() }}">
+                @if ($events->onFirstPage())
+                    <span aria-disabled="true">← Previous</span>
+                @else
+                    <a
+                        class="button"
+                        href="{{ $events->previousPageUrl() }}"
+                        rel="prev"
+                    >
                         ← Previous
                     </a>
                 @endif
@@ -382,9 +430,15 @@
                 </span>
 
                 @if ($events->hasMorePages())
-                    <a class="button" href="{{ $events->nextPageUrl() }}">
+                    <a
+                        class="button"
+                        href="{{ $events->nextPageUrl() }}"
+                        rel="next"
+                    >
                         Next →
                     </a>
+                @else
+                    <span aria-disabled="true">Next →</span>
                 @endif
             </nav>
         @endif

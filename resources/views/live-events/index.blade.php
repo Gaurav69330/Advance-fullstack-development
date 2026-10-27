@@ -23,40 +23,6 @@
             color: inherit;
         }
 
-        header {
-            padding: 20px 6%;
-            border-bottom: 1px solid #d9dccf;
-        }
-
-        .header-content {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-        }
-
-        .brand {
-            font-size: 28px;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-        .brand span {
-            color: #637c26;
-        }
-
-        .navigation {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 18px;
-        }
-
-        .navigation form {
-            margin: 0;
-        }
-
         main {
             max-width: 1250px;
             margin: auto;
@@ -300,11 +266,6 @@
                 grid-column: auto;
             }
 
-            .header-content {
-                flex-direction: column;
-                align-items: start;
-            }
-
             main {
                 padding: 25px 18px 45px;
             }
@@ -332,39 +293,7 @@
 </head>
 
 <body>
-    <header>
-        <div class="header-content">
-            <a class="brand" href="{{ route('events.index') }}">
-                Gig<span>Pulse</span>
-            </a>
-
-            <nav class="navigation" aria-label="Main navigation">
-                <a
-                    href="{{ route('events.index') }}"
-                    aria-current="page"
-                >
-                    Discover
-                </a>
-
-                <a href="{{ route('saved-events.index') }}">
-                    Saved listings
-                </a>
-
-                @auth
-                    <a href="{{ route('my-gigs.index') }}">My gigs</a>
-
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-
-                        <button type="submit">Sign out</button>
-                    </form>
-                @else
-                    <a href="{{ route('login') }}">Sign in</a>
-                    <a href="{{ route('register') }}">Register</a>
-                @endauth
-            </nav>
-        </div>
-    </header>
+    @include('partials.header')
 
     <main>
         @if (session('success'))

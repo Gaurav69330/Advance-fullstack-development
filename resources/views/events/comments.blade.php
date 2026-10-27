@@ -3,6 +3,9 @@
     class="panel"
     aria-labelledby="comments-heading"
     data-comments-url="{{ route('comments.index', $event) }}"
+    data-update-url="{{ route('comments.update', ['comment' => 0]) }}"
+    data-delete-url="{{ route('comments.destroy', ['comment' => 0]) }}"
+    data-csrf="{{ csrf_token() }}"
 >
     <h2 id="comments-heading">Find your crowd.</h2>
 
@@ -94,7 +97,15 @@
         font-size: 12px;
     }
 
-    #comment-body {
+    .comment-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
+    }
+
+    #comment-body,
+    .comment-edit-input {
         display: block;
         width: 100%;
         padding: 12px;
@@ -104,6 +115,15 @@
         color: #20231e;
         font: inherit;
         resize: vertical;
+    }
+
+    .comment-edit-form {
+        margin-top: 15px;
+    }
+
+    .comment-delete-button {
+        background: #873c32 !important;
+        border-color: #873c32 !important;
     }
 </style>
 
@@ -117,17 +137,58 @@
 
         const list = document.getElementById('comments-list');
         const status = document.getElementById('comments-status');
-        const form = document.getElementById('comment-form');
+        const postForm = document.getElementById('comment-form');
 
-        let loading = false;
+        let comments = [];
         let previousResponse = null;
+        let editingId = null;
+        let mutationBusy = false;
+        let loading = false;
         let pollTimer = null;
+        let fetchController = null;
+        let retryDelay = 15000;
+
+        function stopPolling() {
+            clearTimeout(pollTimer);
+            pollTimer = null;
+        }
+
+        function pauseUpdates() {
+            stopPolling();
+            fetchController?.abort();
+        }
+
+        function commentUrl(template, id) {
+            const number = Number(id);
+
+            if (!Number.isSafeInteger(number) || number < 1) {
+                throw new Error('Invalid comment ID.');
+            }
+
+            return template.replace(/\/0$/, '/' + number);
+        }
 
         async function readResponse(response) {
-            const contentType =
-                response.headers.get('content-type') || '';
+            if (response.status === 429) {
+                const seconds = Number(
+                    response.headers.get('Retry-After') || 60
+                );
 
-            if (!contentType.includes('application/json')) {
+                throw new Error(
+                    'Too many requests. Try again in '
+                    + seconds + ' seconds.'
+                );
+            }
+
+            if (response.status === 401 || response.status === 419) {
+                throw new Error(
+                    'Your session expired. Refresh the page and sign in again.'
+                );
+            }
+
+            const type = response.headers.get('content-type') || '';
+
+            if (!type.includes('application/json')) {
                 throw new Error(
                     'Please refresh the page and try again.'
                 );
@@ -138,7 +199,7 @@
             if (!response.ok) {
                 const message = data.errors
                     ? Object.values(data.errors).flat().join(' ')
-                    : data.message || 'The request could not be completed.';
+                    : data.message || 'The request failed.';
 
                 throw new Error(message);
             }
@@ -146,10 +207,48 @@
             return data;
         }
 
-        function renderComments(comments) {
+        async function sendChange(url, method, fields = {}) {
+            const body = new URLSearchParams();
+
+            body.set('_token', section.dataset.csrf);
+
+            if (method !== 'POST') {
+                body.set('_method', method);
+            }
+
+            Object.entries(fields).forEach(([key, value]) => {
+                body.set(key, value);
+            });
+
+            const response = await fetch(url, {
+                method: 'POST',
+                body,
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            return readResponse(response);
+        }
+
+        function makeButton(text, handler, className = '') {
+            const button = document.createElement('button');
+
+            button.type = 'button';
+            button.textContent = text;
+            button.className = className;
+            button.disabled = mutationBusy;
+            button.addEventListener('click', handler);
+
+            return button;
+        }
+
+        function renderComments() {
             const fragment = document.createDocumentFragment();
 
-            if (comments.length === 0) {
+            if (!comments.length) {
                 const empty = document.createElement('p');
 
                 empty.className = 'hint';
@@ -161,7 +260,9 @@
 
             comments.forEach((comment) => {
                 const article = document.createElement('article');
+
                 article.className = 'comment-entry';
+                article.id = 'comment-' + comment.comment_id;
 
                 const author = document.createElement('strong');
                 author.textContent = comment.author;
@@ -170,11 +271,41 @@
                 body.textContent = comment.body;
 
                 const time = document.createElement('time');
-                time.dateTime = comment.created_at;
+
+                const wasEdited = comment.updated_at
+                    && comment.updated_at !== comment.created_at;
+
+                const timestamp = wasEdited
+                    ? comment.updated_at
+                    : comment.created_at;
+
+                time.dateTime = timestamp;
                 time.textContent =
-                    new Date(comment.created_at).toLocaleString();
+                    (wasEdited ? 'Edited ' : 'Posted ')
+                    + new Date(timestamp).toLocaleString();
 
                 article.append(author, body, time);
+
+                if (comment.can_manage) {
+                    const actions = document.createElement('div');
+
+                    actions.className = 'comment-actions';
+
+                    actions.append(
+                        makeButton(
+                            'Edit',
+                            () => startEditing(comment, article)
+                        ),
+                        makeButton(
+                            'Delete',
+                            () => deleteComment(comment),
+                            'comment-delete-button'
+                        )
+                    );
+
+                    article.append(actions);
+                }
+
                 fragment.append(article);
             });
 
@@ -182,15 +313,24 @@
         }
 
         async function loadComments() {
-            if (loading || document.hidden) {
+            if (
+                loading
+                || document.hidden
+                || editingId !== null
+                || mutationBusy
+            ) {
                 return;
             }
 
             loading = true;
             list.setAttribute('aria-busy', 'true');
 
+            const controller = new AbortController();
+            fetchController = controller;
+
             try {
                 const response = await fetch(section.dataset.commentsUrl, {
+                    signal: controller.signal,
                     credentials: 'same-origin',
                     cache: 'no-store',
                     headers: {
@@ -205,30 +345,38 @@
                     throw new Error('Unexpected comments response.');
                 }
 
+                if (editingId !== null || mutationBusy) {
+                    return;
+                }
+
                 const serialized = JSON.stringify(data.comments);
 
                 if (serialized !== previousResponse) {
-                    renderComments(data.comments);
+                    comments = data.comments;
+                    renderComments();
 
                     status.textContent = previousResponse === null
                         ? 'Comments loaded.'
                         : 'Conversation updated.';
 
                     previousResponse = serialized;
-                } else {
-                    status.textContent = 'Comments are up to date.';
                 }
+
+                retryDelay = 15000;
             } catch (error) {
-                status.textContent = error.message;
+                if (error.name !== 'AbortError') {
+                    status.textContent = error.message;
+                    retryDelay = 60000;
+                }
             } finally {
                 loading = false;
+
+                if (fetchController === controller) {
+                    fetchController = null;
+                }
+
                 list.setAttribute('aria-busy', 'false');
             }
-        }
-
-        function stopPolling() {
-            clearTimeout(pollTimer);
-            pollTimer = null;
         }
 
         async function poll() {
@@ -236,63 +384,261 @@
 
             await loadComments();
 
-            if (!document.hidden) {
-                pollTimer = setTimeout(poll, 15000);
+            if (
+                !document.hidden
+                && editingId === null
+                && !mutationBusy
+            ) {
+                stopPolling();
+                pollTimer = setTimeout(poll, retryDelay);
             }
         }
 
-        if (form) {
-            form.addEventListener('submit', async (event) => {
+        function startEditing(comment, article) {
+            if (mutationBusy || editingId !== null) {
+                return;
+            }
+
+            editingId = comment.comment_id;
+            pauseUpdates();
+
+            const originalBody = article.querySelector('p');
+            const originalActions =
+                article.querySelector('.comment-actions');
+
+            originalBody.hidden = true;
+            originalActions.hidden = true;
+
+            const editForm = document.createElement('form');
+            editForm.className = 'comment-edit-form';
+
+            const label = document.createElement('label');
+            label.htmlFor = 'edit-comment-' + comment.comment_id;
+            label.textContent = 'Edit your comment';
+
+            const textarea = document.createElement('textarea');
+
+            textarea.id = label.htmlFor;
+            textarea.className = 'comment-edit-input';
+            textarea.value = comment.body;
+            textarea.rows = 4;
+            textarea.minLength = 2;
+            textarea.maxLength = 1000;
+            textarea.required = true;
+
+            const actions = document.createElement('div');
+            actions.className = 'comment-actions';
+
+            const saveButton = document.createElement('button');
+            saveButton.type = 'submit';
+            saveButton.textContent = 'Save changes';
+
+            const cancelButton = makeButton('Cancel', () => {
+                editingId = null;
+                editForm.remove();
+
+                originalBody.hidden = false;
+                originalActions.hidden = false;
+
+                originalActions.querySelector('button')?.focus();
+
+                status.textContent = 'Editing cancelled.';
+                poll();
+            });
+
+            const feedback = document.createElement('p');
+            feedback.className = 'hint';
+            feedback.setAttribute('role', 'status');
+
+            actions.append(saveButton, cancelButton);
+            editForm.append(label, textarea, actions, feedback);
+            article.append(editForm);
+
+            status.textContent =
+                'Automatic updates paused while you edit.';
+
+            textarea.focus();
+
+            editForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
 
-                const button = document.getElementById('post-comment');
+                const body = textarea.value.trim();
+
+                if (body.length < 2) {
+                    feedback.textContent =
+                        'Write at least two characters.';
+                    return;
+                }
+
+                mutationBusy = true;
+                saveButton.disabled = true;
+                cancelButton.disabled = true;
+                saveButton.textContent = 'Saving…';
+
+                try {
+                    const data = await sendChange(
+                        commentUrl(
+                            section.dataset.updateUrl,
+                            comment.comment_id
+                        ),
+                        'PATCH',
+                        { body }
+                    );
+
+                    comments = comments.map((entry) => {
+                        return entry.comment_id === comment.comment_id
+                            ? data.comment
+                            : entry;
+                    });
+
+                    editingId = null;
+                    mutationBusy = false;
+                    previousResponse = null;
+
+                    renderComments();
+                    status.textContent = data.message;
+
+                    document.getElementById(
+                        'comment-' + comment.comment_id
+                    )?.querySelector('button')?.focus();
+
+                    poll();
+                } catch (error) {
+                    feedback.textContent = error.message;
+                } finally {
+                    mutationBusy = false;
+                    saveButton.disabled = false;
+                    cancelButton.disabled = false;
+                    saveButton.textContent = 'Save changes';
+                }
+            });
+        }
+
+        async function deleteComment(comment) {
+            if (mutationBusy || editingId !== null) {
+                return;
+            }
+
+            const confirmed = window.confirm(
+                'Delete this comment permanently? This cannot be undone.'
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            mutationBusy = true;
+            pauseUpdates();
+            renderComments();
+
+            try {
+                const data = await sendChange(
+                    commentUrl(
+                        section.dataset.deleteUrl,
+                        comment.comment_id
+                    ),
+                    'DELETE'
+                );
+
+                comments = comments.filter(
+                    (entry) => entry.comment_id !== comment.comment_id
+                );
+
+                previousResponse = null;
+                status.textContent = data.message;
+            } catch (error) {
+                status.textContent = error.message;
+            } finally {
+                mutationBusy = false;
+                renderComments();
+                poll();
+            }
+        }
+
+        if (postForm) {
+            postForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+
                 const feedback =
                     document.getElementById('comment-feedback');
+
+                if (mutationBusy || editingId !== null) {
+                    feedback.textContent =
+                        'Finish editing your comment first.';
+                    feedback.className = 'feedback error';
+                    feedback.hidden = false;
+                    return;
+                }
+
+                const button = document.getElementById('post-comment');
+                const textarea = document.getElementById('comment-body');
+                const body = textarea.value.trim();
+
+                if (body.length < 2) {
+                    feedback.textContent =
+                        'Write at least two characters.';
+                    feedback.className = 'feedback error';
+                    feedback.hidden = false;
+                    return;
+                }
+
+                mutationBusy = true;
+                pauseUpdates();
 
                 button.disabled = true;
                 button.textContent = 'Posting…';
                 feedback.hidden = true;
 
                 try {
-                    const response = await fetch(form.action, {
-                        method: 'POST',
-                        body: new FormData(form),
-                        credentials: 'same-origin',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                    });
+                    const data = await sendChange(
+                        postForm.action,
+                        'POST',
+                        { body }
+                    );
 
-                    const data = await readResponse(response);
+                    textarea.value = '';
 
-                    document.getElementById('comment-body').value = '';
+                    comments = comments.filter(
+                        (entry) =>
+                            entry.comment_id !== data.comment.comment_id
+                    );
+
+                    comments.push(data.comment);
+
+                    comments.sort(
+                        (a, b) => a.comment_id - b.comment_id
+                    );
+
+                    comments = comments.slice(-50);
+                    previousResponse = null;
 
                     feedback.textContent = data.message;
                     feedback.className = 'feedback';
                     feedback.hidden = false;
-
-                    await loadComments();
                 } catch (error) {
                     feedback.textContent = error.message;
                     feedback.className = 'feedback error';
                     feedback.hidden = false;
                 } finally {
+                    mutationBusy = false;
                     button.disabled = false;
                     button.textContent = 'Post comment';
+
+                    renderComments();
+                    poll();
                 }
             });
         }
 
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                stopPolling();
+                pauseUpdates();
             } else {
                 poll();
             }
         });
 
-        window.addEventListener('pagehide', stopPolling);
+        window.addEventListener('pagehide', pauseUpdates);
 
         window.addEventListener('pageshow', (event) => {
             if (event.persisted) {

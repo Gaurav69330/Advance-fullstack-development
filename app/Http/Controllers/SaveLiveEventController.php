@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Venue;
 use App\Services\TicketmasterService;
 use Carbon\Carbon;
+use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,12 +33,16 @@ class SaveLiveEventController extends Controller
                 $validated['ticketmaster_id']
             );
         } catch (RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
+            return back()->with(
+                'error',
+                $exception->getMessage()
+            );
         }
 
         $venueData = $item['_embedded']['venues'][0] ?? null;
 
         $dateTime = $item['dates']['start']['dateTime'] ?? null;
+
         $latitude = $venueData['location']['latitude'] ?? null;
         $longitude = $venueData['location']['longitude'] ?? null;
 
@@ -76,6 +81,28 @@ class SaveLiveEventController extends Controller
             $countryCode = null;
         }
 
+        // Prefer the venue timezone, then the event timezone.
+        $timezone = null;
+
+        $timezoneCandidates = [
+            $venueData['timezone'] ?? null,
+            $item['dates']['timezone'] ?? null,
+        ];
+
+        $validTimezones = DateTimeZone::listIdentifiers(
+            DateTimeZone::ALL_WITH_BC
+        );
+
+        foreach ($timezoneCandidates as $candidate) {
+            if (
+                is_string($candidate)
+                && in_array($candidate, $validTimezones, true)
+            ) {
+                $timezone = $candidate;
+                break;
+            }
+        }
+
         $ticketUrl = $item['url'] ?? null;
 
         if (
@@ -93,28 +120,36 @@ class SaveLiveEventController extends Controller
             $latitude,
             $longitude,
             $countryCode,
+            $timezone,
             $ticketUrl,
             $request
         ): Event {
+            $venueValues = [
+                'name' => Str::limit(
+                    $venueData['name'] ?? 'Unknown venue',
+                    255,
+                    ''
+                ),
+                'city' => Str::limit(
+                    $venueData['city']['name'] ?? 'Unknown city',
+                    255,
+                    ''
+                ),
+                'country_code' => $countryCode,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+            ];
+
+            // Preserve an existing timezone if the API omits it.
+            if ($timezone !== null) {
+                $venueValues['timezone'] = $timezone;
+            }
+
             $venue = Venue::updateOrCreate(
                 [
                     'ticketmaster_id' => $venueData['id'],
                 ],
-                [
-                    'name' => Str::limit(
-                        $venueData['name'] ?? 'Unknown venue',
-                        255,
-                        ''
-                    ),
-                    'city' => Str::limit(
-                        $venueData['city']['name'] ?? 'Unknown city',
-                        255,
-                        ''
-                    ),
-                    'country_code' => $countryCode,
-                    'latitude' => $latitude,
-                    'longitude' => $longitude,
-                ]
+                $venueValues
             );
 
             $event = Event::updateOrCreate(
@@ -142,8 +177,7 @@ class SaveLiveEventController extends Controller
                 ]
             );
 
-            // Save to this user's diary without overwriting an
-            // existing Attending or Went status.
+            // Keep an existing attendance status unchanged.
             $event->attendances()->firstOrCreate(
                 [
                     'user_id' => $request->user()->id,

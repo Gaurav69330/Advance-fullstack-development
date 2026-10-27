@@ -9,9 +9,9 @@ use App\Http\Controllers\LiveEventController;
 use App\Http\Controllers\MyGigController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SaveLiveEventController;
+use App\Http\Controllers\SearchSuggestionController;
 use App\Http\Controllers\TicketPhotoController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\SearchSuggestionController;
 
 // Main Discover page: worldwide search and Near me.
 Route::get('/', [LiveEventController::class, 'index'])
@@ -23,7 +23,15 @@ Route::get('/live-events', [LiveEventController::class, 'index'])
     ->middleware('throttle:30,1')
     ->name('live-events.index');
 
-// Browse events already stored in GigPulse.
+// Autocomplete suggestions from saved upcoming events.
+Route::get(
+    '/search-suggestions',
+    [SearchSuggestionController::class, 'index']
+)
+    ->middleware('throttle:60,1')
+    ->name('search-suggestions.index');
+
+// Browse events stored in GigPulse.
 Route::get('/saved-events', [EventController::class, 'index'])
     ->name('saved-events.index');
 
@@ -41,13 +49,6 @@ Route::get(
     ->middleware('throttle:60,1')
     ->name('comments.index');
 
-// Autocomplete suggestions from saved upcoming events.
-Route::get(
-    '/search-suggestions',
-    [SearchSuggestionController::class, 'index']
-)
-    ->middleware('throttle:60,1')
-    ->name('search-suggestions.index');
 // Registration and login.
 Route::middleware('guest')->group(function () {
     Route::get('/register', [AuthController::class, 'showRegister'])
@@ -65,12 +66,15 @@ Route::middleware('guest')->group(function () {
 
 // Pages and actions for signed-in users.
 Route::middleware('auth')->group(function () {
+    // Personal gig diary.
     Route::get('/my-gigs', [MyGigController::class, 'index'])
         ->name('my-gigs.index');
 
+    // Sign out.
     Route::post('/logout', [AuthController::class, 'logout'])
         ->name('logout');
 
+    // Save or update attendance status.
     Route::post(
         '/events/{event}/attendance',
         [AttendanceController::class, 'store']
@@ -79,10 +83,12 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:30,1')
         ->name('attendance.store');
 
+    // Bulk import Ticketmaster listings.
     Route::post('/discover', [DiscoveryController::class, 'store'])
         ->middleware('throttle:5,1')
         ->name('discovery.store');
 
+    // Save one selected Ticketmaster event.
     Route::post(
         '/live-events/save',
         [SaveLiveEventController::class, 'store']
@@ -90,7 +96,7 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:10,1')
         ->name('live-events.save');
 
-    // Upload or replace a photo.
+    // Upload or replace a private ticket/concert photo.
     Route::post(
         '/events/{event}/photo',
         [TicketPhotoController::class, 'store']
@@ -99,7 +105,7 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:10,1')
         ->name('ticket-photos.store');
 
-    // View a photo after checking ownership.
+    // Display a photo after checking ownership.
     Route::get(
         '/ticket-photos/{attendance}',
         [TicketPhotoController::class, 'show']
@@ -116,12 +122,39 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:10,1')
         ->name('reviews.store');
 
+    // Delete your own review.
+    Route::delete(
+        '/reviews/{review}',
+        [ReviewController::class, 'destroy']
+    )
+        ->whereNumber('review')
+        ->middleware('throttle:10,1')
+        ->name('reviews.destroy');
+
     // Post a comment.
     Route::post(
         '/events/{event}/comments',
         [CommentController::class, 'store']
     )
         ->whereNumber('event')
-        ->middleware('throttle:5,1')
+        ->middleware('throttle:comment-posts')
         ->name('comments.store');
+
+    // Edit your own comment.
+    Route::patch(
+        '/comments/{comment}',
+        [CommentController::class, 'update']
+    )
+        ->whereNumber('comment')
+        ->middleware('throttle:comment-posts')
+        ->name('comments.update');
+
+    // Delete your own comment.
+    Route::delete(
+        '/comments/{comment}',
+        [CommentController::class, 'destroy']
+    )
+        ->whereNumber('comment')
+        ->middleware('throttle:comment-posts')
+        ->name('comments.destroy');
 });

@@ -19,22 +19,6 @@
             line-height: 1.6;
         }
 
-        header {
-            padding: 20px 6%;
-            border-bottom: 1px solid #d9dccf;
-        }
-
-        .brand {
-            color: #20231e;
-            font-size: 28px;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-        .brand span {
-            color: #637c26;
-        }
-
         main {
             max-width: 480px;
             margin: 50px auto;
@@ -58,14 +42,14 @@
             color: #686b60;
         }
 
-        label {
+        .card label {
             display: block;
             margin-top: 18px;
             font-size: 14px;
             font-weight: bold;
         }
 
-        input {
+        .card input {
             display: block;
             width: 100%;
             min-height: 46px;
@@ -78,11 +62,11 @@
             font: inherit;
         }
 
-        input[aria-invalid="true"] {
+        .card input[aria-invalid="true"] {
             border-color: #a83232;
         }
 
-        button {
+        .submit-button {
             width: 100%;
             min-height: 46px;
             margin-top: 25px;
@@ -96,7 +80,7 @@
             cursor: pointer;
         }
 
-        button:hover {
+        .submit-button:hover {
             background: #344b38;
         }
 
@@ -119,7 +103,7 @@
             font-size: 14px;
         }
 
-        a {
+        .card a {
             color: #435d21;
         }
 
@@ -141,11 +125,7 @@
 </head>
 
 <body>
-    <header>
-        <a class="brand" href="{{ route('events.index') }}">
-            Gig<span>Pulse</span>
-        </a>
-    </header>
+    @include('partials.header')
 
     <main>
         <section class="card" aria-labelledby="login-heading">
@@ -207,7 +187,9 @@
                     </p>
                 @enderror
 
-                <button type="submit">Sign in →</button>
+                <button class="submit-button" type="submit">
+                    Sign in →
+                </button>
             </form>
 
             <p class="register-link">
