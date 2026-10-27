@@ -55,4 +55,13 @@ class Event extends Model
             'event_id'
         );
     }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(
+            Comment::class,
+            'event_id',
+            'event_id'
+        );
+    }
 }
