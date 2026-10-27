@@ -581,6 +581,7 @@
             @endauth
 
             @include('events.reviews')
+            @include('events.comments')
         </article>
     </main>
 
