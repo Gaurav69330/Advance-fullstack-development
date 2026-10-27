@@ -2,11 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>{{ $event->artist_name }} | GigPulse</title>
 
@@ -23,21 +19,29 @@
             line-height: 1.6;
         }
 
+        a {
+            color: inherit;
+        }
+
         header {
             padding: 20px 6%;
             border-bottom: 1px solid #d9dccf;
         }
 
-        .header-content {
+        .header-content,
+        .navigation,
+        .badges {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
+            gap: 16px;
+        }
+
+        .header-content {
             justify-content: space-between;
-            gap: 20px;
         }
 
         .brand {
-            color: #20231e;
             font-size: 28px;
             font-weight: bold;
             text-decoration: none;
@@ -47,19 +51,11 @@
             color: #637c26;
         }
 
-        .account-nav {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 16px;
+        .navigation {
             font-size: 14px;
         }
 
-        .account-nav a {
-            color: #20231e;
-        }
-
-        .account-nav form {
+        .navigation form {
             margin: 0;
         }
 
@@ -72,7 +68,6 @@
         .back-link {
             display: inline-block;
             margin-bottom: 30px;
-            color: #20231e;
         }
 
         .event-card {
@@ -82,12 +77,20 @@
             border-radius: 10px;
         }
 
-        .genre {
+        .badges {
+            gap: 8px;
+        }
+
+        .badge {
             display: inline-block;
             padding: 5px 14px;
             background: #d8f36a;
             border-radius: 20px;
             font-size: 13px;
+        }
+
+        .badge.secondary {
+            background: #e8ecdf;
         }
 
         h1 {
@@ -99,6 +102,7 @@
 
         h2 {
             margin-top: 0;
+            line-height: 1.2;
         }
 
         .description {
@@ -128,18 +132,17 @@
             font-weight: bold;
         }
 
-        .notice {
-            margin-top: 25px;
-            padding: 15px;
-            background: #e8ecdf;
-            border-radius: 5px;
-        }
-
-        .attendance-panel {
-            margin-top: 30px;
-            padding: 25px;
+        .notice,
+        .panel {
+            padding: 24px;
+            margin-top: 28px;
             background: #e8ecdf;
             border-radius: 8px;
+        }
+
+        .hint {
+            color: #686b60;
+            font-size: 13px;
         }
 
         label {
@@ -148,15 +151,17 @@
             font-weight: bold;
         }
 
-        select {
+        select,
+        input[type="file"] {
             display: block;
             width: 100%;
-            max-width: 350px;
+            max-width: 450px;
             min-height: 46px;
             padding: 10px;
             border: 1px solid #bbc5a8;
             border-radius: 5px;
             background: white;
+            color: #20231e;
             font: inherit;
         }
 
@@ -184,25 +189,41 @@
             cursor: wait;
         }
 
-        #attendance-form button {
+        .panel form button {
             margin-top: 15px;
         }
 
         .feedback {
             padding: 12px 16px;
+            border: 1px solid #bbc9a4;
             border-radius: 5px;
             background: #e8ecdf;
-            border: 1px solid #bbc9a4;
         }
 
         .feedback.error {
-            background: #fff0ec;
             border-color: #e1b1a7;
+            background: #fff0ec;
             color: #8b2727;
         }
 
-        #attendance-feedback {
-            margin-bottom: 0;
+        .photo-choice {
+            margin: 20px 0;
+        }
+
+        .photo-preview,
+        .saved-photo {
+            display: block;
+            max-width: 100%;
+            max-height: 420px;
+            margin-top: 20px;
+            border: 1px solid #c8cdbd;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+
+        .saved-photo-link {
+            display: inline-block;
+            margin-top: 10px;
         }
 
         footer {
@@ -239,35 +260,60 @@
                 align-items: start;
             }
 
-            .attendance-panel {
+            .panel {
                 padding: 20px;
             }
 
             select,
-            #attendance-form button {
-                max-width: none;
+            input[type="file"],
+            .panel form button {
                 width: 100%;
+                max-width: none;
             }
         }
     </style>
 </head>
 
 <body>
+    @php
+        $attendance = auth()->check()
+            ? $event->attendances()
+                ->where('user_id', auth()->id())
+                ->first()
+            : null;
+
+        $savedStatus = $attendance?->status;
+
+        $selectedStatus = old(
+            'status',
+            $savedStatus ?? 'Interested'
+        );
+
+        $attendanceCount = $event->attendances()
+            ->where('status', 'Attending')
+            ->count();
+    @endphp
+
     <header>
         <div class="header-content">
             <a class="brand" href="{{ route('events.index') }}">
                 Gig<span>Pulse</span>
             </a>
 
-            <nav class="account-nav" aria-label="Main navigation">
+            <nav class="navigation" aria-label="Main navigation">
                 <a href="{{ route('events.index') }}">Discover</a>
 
+                <a href="{{ route('saved-events.index') }}">
+                    Saved listings
+                </a>
+
                 @auth
+                    <a href="{{ route('my-gigs.index') }}">My gigs</a>
+
                     <span>Hello, {{ auth()->user()->name }}</span>
 
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-
                         <button type="submit">Sign out</button>
                     </form>
                 @else
@@ -280,12 +326,18 @@
 
     <main>
         <a class="back-link" href="{{ route('events.index') }}">
-            ← Back to discovery
+            ← Back to Discover
         </a>
 
         @if (session('success'))
             <p class="feedback" role="status">
                 {{ session('success') }}
+            </p>
+        @endif
+
+        @if (session('error'))
+            <p class="feedback error" role="alert">
+                {{ session('error') }}
             </p>
         @endif
 
@@ -300,9 +352,17 @@
         @endif
 
         <article class="event-card">
-            <span class="genre">
-                {{ $event->genre ?: 'Live music' }}
-            </span>
+            <div class="badges">
+                <span class="badge">
+                    {{ $event->genre ?: 'Live music' }}
+                </span>
+
+                @if ($event->is_demo)
+                    <span class="badge secondary">
+                        Fictional sample gig
+                    </span>
+                @endif
+            </div>
 
             <h1>{{ $event->artist_name }}</h1>
 
@@ -317,7 +377,7 @@
                 </div>
 
                 <div>
-                    <dt>Time</dt>
+                    <dt>Time ({{ config('app.timezone', 'UTC') }})</dt>
                     <dd>
                         {{ $event->event_date->format('H:i') }}
                     </dd>
@@ -331,9 +391,13 @@
                 </div>
 
                 <div>
-                    <dt>City</dt>
+                    <dt>Location</dt>
                     <dd>
                         {{ $event->venue?->city ?? 'To be confirmed' }}
+
+                        @if ($event->venue?->country_code)
+                            · {{ $event->venue->country_code }}
+                        @endif
                     </dd>
                 </div>
             </dl>
@@ -342,34 +406,19 @@
                 <p class="notice">
                     This event has already taken place.
                 </p>
-            @else
-                <p class="notice">
-                    Something to look forward to. Plan your next night out!
-                </p>
             @endif
 
-            <section class="attendance-panel">
-                <h2>Make it a plan.</h2>
+            <section class="panel" aria-labelledby="plans-heading">
+                <h2 id="plans-heading">Make it a plan.</h2>
 
                 <p>
                     <strong id="attendance-count">
-                        {{ $event->attendances()->where('status', 'Attending')->count() }}
+                        {{ $attendanceCount }}
                     </strong>
                     going
                 </p>
 
                 @auth
-                    @php
-                        $savedStatus = $event->attendances()
-                            ->where('user_id', auth()->id())
-                            ->value('status');
-
-                        $selectedStatus = old(
-                            'status',
-                            $savedStatus ?? 'Interested'
-                        );
-                    @endphp
-
                     <p id="saved-status">
                         {{ $savedStatus ? 'Your status: ' . $savedStatus : 'You have not saved this gig yet.' }}
                     </p>
@@ -427,6 +476,111 @@
                     </a>
                 @endauth
             </section>
+
+            @auth
+                <section class="panel" aria-labelledby="photo-heading">
+                    <h2 id="photo-heading">Keep the memory.</h2>
+
+                    <p>
+                        Add a ticket stub or concert photo.
+                        Your photo is private to your account.
+                    </p>
+
+                    <p class="hint">
+                        JPEG, PNG, or WebP. Maximum file size: 5 MB.
+                        Saving another photo replaces the previous one.
+                    </p>
+
+                    @if ($attendance?->ticket_photo_path)
+                        <h3>Your saved photo</h3>
+
+                        <img
+                            class="saved-photo"
+                            src="{{ route('ticket-photos.show', $attendance) }}"
+                            alt="Your saved ticket or concert photo"
+                            loading="lazy"
+                        >
+
+                        <a
+                            class="saved-photo-link"
+                            href="{{ route('ticket-photos.show', $attendance) }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Open full photo ↗
+                        </a>
+                    @endif
+
+                    <div
+                        id="photo-save-reminder"
+                        @if ($attendance) hidden @endif
+                    >
+                        <p>
+                            Save your plans above first to enable photo uploads.
+                        </p>
+                    </div>
+
+                    <form
+                        id="photo-form"
+                        method="POST"
+                        action="{{ route('ticket-photos.store', $event) }}"
+                        enctype="multipart/form-data"
+                        @if (!$attendance) hidden @endif
+                    >
+                        @csrf
+
+                        <div class="photo-choice">
+                            <label for="photo-file">
+                                Choose an existing photo
+                            </label>
+
+                            <input
+                                id="photo-file"
+                                name="photo"
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                            >
+                        </div>
+
+                        <div class="photo-choice">
+                            <label for="photo-camera">
+                                Or take a photo
+                            </label>
+
+                            <input
+                                id="photo-camera"
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                capture="environment"
+                            >
+
+                            <p class="hint">
+                                Supported phones may open the rear camera.
+                                Other devices may show a file picker.
+                            </p>
+                        </div>
+
+                        <p
+                            id="photo-feedback"
+                            role="status"
+                            aria-live="polite"
+                        ></p>
+
+                        <img
+                            id="photo-preview"
+                            class="photo-preview"
+                            alt="Preview of the photo you selected"
+                            hidden
+                        >
+
+                        <button id="upload-photo" type="submit">
+                            Save photo
+                        </button>
+                    </form>
+                </section>
+            @endauth
+
+            @include('events.reviews')
         </article>
     </main>
 
@@ -435,71 +589,194 @@
     </footer>
 
     <script>
-        const attendanceForm = document.getElementById('attendance-form');
+        (() => {
+            const attendanceForm =
+                document.getElementById('attendance-form');
 
-        if (attendanceForm) {
-            attendanceForm.addEventListener('submit', async (event) => {
-                event.preventDefault();
+            if (attendanceForm) {
+                attendanceForm.addEventListener('submit', async (event) => {
+                    event.preventDefault();
 
-                const button = document.getElementById('save-attendance');
-                const feedback = document.getElementById('attendance-feedback');
+                    const button =
+                        document.getElementById('save-attendance');
 
-                button.disabled = true;
-                button.textContent = 'Saving…';
-                feedback.hidden = true;
+                    const feedback =
+                        document.getElementById('attendance-feedback');
 
-                try {
-                    const response = await fetch(attendanceForm.action, {
-                        method: 'POST',
-                        body: new FormData(attendanceForm),
-                        credentials: 'same-origin',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                    });
+                    button.disabled = true;
+                    button.textContent = 'Saving…';
+                    feedback.hidden = true;
 
-                    const contentType = response.headers.get('content-type') || '';
+                    try {
+                        const response = await fetch(attendanceForm.action, {
+                            method: 'POST',
+                            body: new FormData(attendanceForm),
+                            credentials: 'same-origin',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                        });
 
-                    if (!contentType.includes('application/json')) {
-                        throw new Error(
-                            'Your session may have expired. Refresh the page and try again.'
-                        );
-                    }
+                        const contentType =
+                            response.headers.get('content-type') || '';
 
-                    const data = await response.json();
-
-                    if (!response.ok) {
-                        let message = data.message || 'Could not save your plans.';
-
-                        if (data.errors) {
-                            message = Object.values(data.errors)
-                                .flat()
-                                .join(' ');
+                        if (!contentType.includes('application/json')) {
+                            throw new Error(
+                                'Please refresh the page and sign in again.'
+                            );
                         }
 
-                        throw new Error(message);
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            const message = data.errors
+                                ? Object.values(data.errors).flat().join(' ')
+                                : data.message || 'Could not save your plans.';
+
+                            throw new Error(message);
+                        }
+
+                        document.getElementById('attendance-count')
+                            .textContent = data.attendance_count;
+
+                        document.getElementById('saved-status')
+                            .textContent = 'Your status: ' + data.status;
+
+                        feedback.textContent = data.message;
+                        feedback.className = 'feedback';
+                        feedback.hidden = false;
+
+                        const photoForm =
+                            document.getElementById('photo-form');
+
+                        const reminder =
+                            document.getElementById('photo-save-reminder');
+
+                        if (photoForm) {
+                            photoForm.hidden = false;
+                        }
+
+                        if (reminder) {
+                            reminder.hidden = true;
+                        }
+                    } catch (error) {
+                        feedback.textContent = error.message;
+                        feedback.className = 'feedback error';
+                        feedback.hidden = false;
+                    } finally {
+                        button.disabled = false;
+                        button.textContent = 'Save my plans';
                     }
+                });
+            }
 
-                    document.getElementById('attendance-count').textContent =
-                        data.attendance_count;
+            const photoForm = document.getElementById('photo-form');
 
-                    document.getElementById('saved-status').textContent =
-                        'Your status: ' + data.status;
+            if (!photoForm) {
+                return;
+            }
 
-                    feedback.textContent = data.message;
-                    feedback.className = 'feedback';
-                    feedback.hidden = false;
-                } catch (error) {
-                    feedback.textContent = error.message;
-                    feedback.className = 'feedback error';
-                    feedback.hidden = false;
-                } finally {
-                    button.disabled = false;
-                    button.textContent = 'Save my plans';
+            const fileInput = document.getElementById('photo-file');
+            const cameraInput = document.getElementById('photo-camera');
+            const preview = document.getElementById('photo-preview');
+            const feedback = document.getElementById('photo-feedback');
+            const uploadButton = document.getElementById('upload-photo');
+
+            let previewUrl = null;
+
+            function clearPreview() {
+                if (previewUrl) {
+                    URL.revokeObjectURL(previewUrl);
+                    previewUrl = null;
                 }
+
+                preview.hidden = true;
+                preview.removeAttribute('src');
+            }
+
+            function selectPhoto(activeInput, otherInput) {
+                const file = activeInput.files[0];
+
+                clearPreview();
+                otherInput.value = '';
+                otherInput.removeAttribute('name');
+                activeInput.name = 'photo';
+
+                if (!file) {
+                    feedback.textContent = 'No photo selected.';
+                    feedback.className = 'hint';
+                    return;
+                }
+
+                const allowedTypes = [
+                    'image/jpeg',
+                    'image/png',
+                    'image/webp',
+                ];
+
+                if (!allowedTypes.includes(file.type)) {
+                    activeInput.value = '';
+                    feedback.textContent =
+                        'Choose a JPEG, PNG, or WebP photo.';
+                    feedback.className = 'feedback error';
+                    return;
+                }
+
+                if (file.size > 5 * 1024 * 1024) {
+                    activeInput.value = '';
+                    feedback.textContent =
+                        'Your photo must be 5 MB or smaller.';
+                    feedback.className = 'feedback error';
+                    return;
+                }
+
+                previewUrl = URL.createObjectURL(file);
+                preview.src = previewUrl;
+                preview.hidden = false;
+
+                feedback.textContent = 'Photo selected: ' + file.name;
+                feedback.className = 'hint';
+            }
+
+            fileInput.addEventListener('change', () => {
+                selectPhoto(fileInput, cameraInput);
             });
-        }
+
+            cameraInput.addEventListener('change', () => {
+                selectPhoto(cameraInput, fileInput);
+            });
+
+            photoForm.addEventListener('submit', (event) => {
+                const activeInput = fileInput.files.length
+                    ? fileInput
+                    : cameraInput;
+
+                const file = activeInput.files[0];
+
+                if (!file) {
+                    event.preventDefault();
+
+                    feedback.textContent =
+                        'Choose or take a photo before saving.';
+                    feedback.className = 'feedback error';
+                    return;
+                }
+
+                // Submit exactly one photo field.
+                fileInput.removeAttribute('name');
+                cameraInput.removeAttribute('name');
+                activeInput.name = 'photo';
+
+                uploadButton.disabled = true;
+                uploadButton.textContent = 'Uploading…';
+            });
+
+            window.addEventListener('pageshow', () => {
+                uploadButton.disabled = false;
+                uploadButton.textContent = 'Save photo';
+            });
+        })();
     </script>
 </body>
 </html>
