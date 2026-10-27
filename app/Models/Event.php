@@ -19,16 +19,20 @@ class Event extends Model
         'genre',
         'spotify_artist_id',
         'description',
+        'ticketmaster_id',
+        'ticket_url',
+        'is_demo',
     ];
 
     protected $casts = [
         'event_date' => 'datetime',
+        'is_demo' => 'boolean',
     ];
 
     public function venue(): BelongsTo
     {
         return $this->belongsTo(
-            'App\\Models\\Venue',
+            Venue::class,
             'venue_id',
             'venue_id'
         );
