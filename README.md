@@ -21,6 +21,37 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
+## Project Structure
+
+```text
+my-app/
+├── app/
+│   ├── Http/Controllers/          # Request controllers
+│   ├── Models/                    # Eloquent models
+│   └── Providers/                 # Service providers
+├── bootstrap/                     # Application bootstrapping
+├── config/                        # Application configuration
+├── database/
+│   ├── factories/                 # Model factories
+│   ├── migrations/                # Database schema migrations
+│   ├── seeders/                   # Database seeders
+│   └── database.sqlite            # SQLite database
+├── public/                        # Web server entry point and public assets
+├── resources/
+│   ├── css/                       # Stylesheets
+│   ├── js/                        # JavaScript
+│   └── views/                     # Blade templates
+├── routes/                        # Web and console routes
+├── tests/
+│   ├── Feature/                   # Feature tests
+│   └── Unit/                      # Unit tests
+├── artisan                        # Laravel command-line tool
+├── composer.json                  # PHP dependencies and scripts
+├── package.json                   # Frontend dependencies and scripts
+├── phpunit.xml                    # PHPUnit configuration
+└── vite.config.js                 # Vite build configuration
+```
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
