@@ -127,4 +127,18 @@ class LiveEventController extends Controller
             'error' => $error,
         ]);
     }
+    public function show(
+    string $ticketmasterId,
+    TicketmasterService $ticketmaster
+): \Illuminate\View\View {
+    try {
+        $item = $ticketmaster->findEvent($ticketmasterId);
+    } catch (\RuntimeException $exception) {
+        abort(503, 'This Ticketmaster listing is currently unavailable.');
+    }
+
+    return view('live-events.show', [
+        'item' => $item,
+    ]);
+}
 }
