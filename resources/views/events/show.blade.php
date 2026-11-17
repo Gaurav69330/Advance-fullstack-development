@@ -327,6 +327,15 @@
                 @endif
             </div>
 
+            @if ($event->image_url)
+                <img
+                    src="{{ $event->image_url }}"
+                    alt=""
+                    decoding="async"
+                    style="display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; margin-bottom: 1rem;"
+                >
+            @endif
+
             <h1>{{ $event->artist_name }}</h1>
 
             <p class="description">{{ $event->description ?: 'More details about this gig will be available soon.' }}</p>

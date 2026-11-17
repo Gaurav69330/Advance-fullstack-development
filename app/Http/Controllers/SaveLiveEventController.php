@@ -33,14 +33,10 @@ class SaveLiveEventController extends Controller
                 $validated['ticketmaster_id']
             );
         } catch (RuntimeException $exception) {
-            return back()->with(
-                'error',
-                $exception->getMessage()
-            );
+            return back()->with('error', $exception->getMessage());
         }
 
         $venueData = $item['_embedded']['venues'][0] ?? null;
-
         $dateTime = $item['dates']['start']['dateTime'] ?? null;
 
         $latitude = $venueData['location']['latitude'] ?? null;
@@ -67,10 +63,7 @@ class SaveLiveEventController extends Controller
                 ->utc()
                 ->format('Y-m-d H:i:s');
         } catch (\Exception $exception) {
-            return back()->with(
-                'error',
-                'This event has an invalid date.'
-            );
+            return back()->with('error', 'This event has an invalid date.');
         }
 
         $countryCode = strtoupper(
@@ -113,6 +106,22 @@ class SaveLiveEventController extends Controller
             $ticketUrl = null;
         }
 
+        $images = collect($item['images'] ?? [])
+            ->filter(fn ($image) => is_array($image)
+                && is_string($image['url'] ?? null)
+                && filter_var($image['url'], FILTER_VALIDATE_URL)
+                && parse_url($image['url'], PHP_URL_SCHEME) === 'https');
+
+        $landscapeImages = $images->filter(
+            fn ($image) => ($image['ratio'] ?? null) === '16_9'
+                && ($image['width'] ?? 0) >= 640
+        )->sortBy('width');
+
+        $cover = $landscapeImages->first(fn ($image) => empty($image['fallback']))
+            ?? $images->first(fn ($image) => empty($image['fallback']))
+            ?? $landscapeImages->first()
+            ?? $images->first();
+
         $event = DB::transaction(function () use (
             $item,
             $venueData,
@@ -122,6 +131,7 @@ class SaveLiveEventController extends Controller
             $countryCode,
             $timezone,
             $ticketUrl,
+            $cover,
             $request
         ): Event {
             $venueValues = [
@@ -146,45 +156,43 @@ class SaveLiveEventController extends Controller
             }
 
             $venue = Venue::updateOrCreate(
-                [
-                    'ticketmaster_id' => $venueData['id'],
-                ],
+                ['ticketmaster_id' => $venueData['id']],
                 $venueValues
             );
 
+            $eventValues = [
+                'venue_id' => $venue->venue_id,
+                'artist_name' => Str::limit(
+                    $item['name'] ?? 'Live music event',
+                    255,
+                    ''
+                ),
+                'event_date' => $eventDate,
+                'genre' => Str::limit(
+                    $item['classifications'][0]['genre']['name'] ?? 'Music',
+                    255,
+                    ''
+                ),
+                'description' => $item['info']
+                    ?? 'Live event listing supplied by Ticketmaster.',
+                'ticket_url' => $ticketUrl,
+                'is_demo' => false,
+            ];
+
+            // Preserve the saved image if Ticketmaster omits it.
+            if ($cover !== null) {
+                $eventValues['image_url'] = $cover['url'];
+            }
+
             $event = Event::updateOrCreate(
-                [
-                    'ticketmaster_id' => $item['id'],
-                ],
-                [
-                    'venue_id' => $venue->venue_id,
-                    'artist_name' => Str::limit(
-                        $item['name'] ?? 'Live music event',
-                        255,
-                        ''
-                    ),
-                    'event_date' => $eventDate,
-                    'genre' => Str::limit(
-                        $item['classifications'][0]['genre']['name']
-                            ?? 'Music',
-                        255,
-                        ''
-                    ),
-                    'description' => $item['info']
-                        ?? 'Live event listing supplied by Ticketmaster.',
-                    'ticket_url' => $ticketUrl,
-                    'is_demo' => false,
-                ]
+                ['ticketmaster_id' => $item['id']],
+                $eventValues
             );
 
             // Keep an existing attendance status unchanged.
             $event->attendances()->firstOrCreate(
-                [
-                    'user_id' => $request->user()->id,
-                ],
-                [
-                    'status' => 'Interested',
-                ]
+                ['user_id' => $request->user()->id],
+                ['status' => 'Interested']
             );
 
             return $event;

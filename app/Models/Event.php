@@ -22,6 +22,8 @@ class Event extends Model
         'ticketmaster_id',
         'ticket_url',
         'is_demo',
+        'ticketmaster_id',
+        'image_url',
     ];
 
     protected $casts = [
