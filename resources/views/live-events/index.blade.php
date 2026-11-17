@@ -564,7 +564,15 @@
                         <article class="card">
                             <span class="badge">{{ $genreName }}</span>
 
-                            <h2>{{ $eventName }}</h2>
+                            <h2>
+                                @if ($validEventId)
+                                    <a href="{{ route('live-events.show', ['ticketmasterId' => $ticketmasterId]) }}">
+                                        {{ $eventName }}
+                                    </a>
+                                @else
+                                    {{ $eventName }}
+                                @endif
+                            </h2>
 
                             <p>
                                 <strong>Date:</strong>
