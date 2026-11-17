@@ -1,89 +1,137 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# GigPulse
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+GigPulse is a live music discovery and gig diary web app. Search Ticketmaster listings by artist, city, or country, preview an event from Discover, and sign in to save it to **My gigs**.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Browse Ticketmaster events, view available artwork and venue details, and follow ticket links.
+- Use **Near me** to search for gigs within 10 miles. Restore your previous Discover filters with **Use last search**.
+- Track attendance, write reviews, and post event comments. Search suggestions, attendance, comments, and reviews use JavaScript Fetch to update the page. Comments refresh periodically.
+- Capture or upload a ticket stub or concert photo. Saved photos are private to the account that uploaded them.
+- Browse on a phone using the responsive layout and collapsible navigation.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Run locally
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+You need PHP 8.4.1 or later with PDO MySQL enabled, Composer, and MySQL or MariaDB. On Windows you can start the database from the XAMPP Control Panel.
 
-## Project Structure
+1. Open a terminal in the cloned or extracted GigPulse folder and run:
+
+   ```powershell
+   composer install
+   Copy-Item .env.example .env
+   php artisan key:generate
+   ```
+
+   If you already have a configured `.env`, keep it and skip the copy and key generation steps.
+
+2. Create an empty database named `gigpulse_laravel`. Set the following values in `.env`, using the credentials for your local database and your own Ticketmaster Discovery API key.
+
+   ```dotenv
+   APP_NAME=GigPulse
+   APP_URL=http://127.0.0.1:8000
+
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=gigpulse_laravel
+   DB_USERNAME=root
+   DB_PASSWORD=
+
+   TICKETMASTER_API_KEY=your_consumer_key
+   ```
+
+   Keep `.env` out of Git. The Ticketmaster key is read by Laravel on the server.
+
+3. Run the migrations and start Laravel.
+
+   ```powershell
+   php artisan migrate
+   php artisan serve
+   ```
+
+4. Open [GigPulse](http://127.0.0.1:8000/). Register an account to save events and use **My gigs**.
+
+To add sample events to a development database, run `php artisan db:seed --class=GigPulseSeeder`.
+
+## Coursework demo
+
+1. Search on Discover and click an event title to open its public preview. Sign in and save an event, then reopen it from **My gigs**.
+2. On a saved event, change attendance or post a comment. In Firefox DevTools, use **Network → XHR** to see the Fetch requests. Open the event in a second tab to demonstrate automatic comment refresh.
+3. Show the mobile menu, restore a previous search, run **Near me**, and capture and save a photo. Use localhost on the PC or a trusted HTTPS address on a phone for geolocation and live camera access.
+
+## Project structure
 
 ```text
-my-app/
+GigPulse/
 ├── app/
-│   ├── Http/Controllers/          # Request controllers
-│   ├── Models/                    # Eloquent models
-│   └── Providers/                 # Service providers
-├── bootstrap/                     # Application bootstrapping
-├── config/                        # Application configuration
+│   ├── Http/Controllers/    # Web requests and responses
+│   ├── Models/              # Eloquent records and relationships
+│   ├── Providers/           # Application setup and rate limits
+│   └── Services/            # Ticketmaster integration
+├── bootstrap/               # Laravel startup and middleware configuration
+├── config/                  # Application, database, storage, and service settings
 ├── database/
-│   ├── factories/                 # Model factories
-│   ├── migrations/                # Database schema migrations
-│   ├── seeders/                   # Database seeders
-│   └── database.sqlite            # SQLite database
-├── public/                        # Web server entry point and public assets
-├── resources/
-│   ├── css/                       # Stylesheets
-│   ├── js/                        # JavaScript
-│   └── views/                     # Blade templates
-├── routes/                        # Web and console routes
-├── tests/
-│   ├── Feature/                   # Feature tests
-│   └── Unit/                      # Unit tests
-├── artisan                        # Laravel command-line tool
-├── composer.json                  # PHP dependencies and scripts
-├── package.json                   # Frontend dependencies and scripts
-├── phpunit.xml                    # PHPUnit configuration
-└── vite.config.js                 # Vite build configuration
+│   ├── migrations/          # Tables, columns, constraints, and indexes
+│   └── seeders/             # Sample data for local development
+├── public/
+│   ├── index.php            # Web entry point
+│   └── js/                  # Discover page browser scripts
+├── resources/views/         # Blade templates
+├── routes/                  # Web routes and console commands
+├── storage/                 # Runtime files, logs, and private uploads
+└── tests/                   # Laravel feature and unit test suites
 ```
 
-## Learning Laravel
+### Routes, controllers, and services
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+| File | What it does |
+| --- | --- |
+| `routes/web.php` | Maps page URLs and form actions to controllers and applies authentication and rate limits. |
+| `routes/console.php` | Registers custom Artisan console commands. |
+| `app/Http/Controllers/Controller.php` | Base controller for the application. |
+| `app/Http/Controllers/LiveEventController.php` | Handles Discover search, pagination, and public Ticketmaster event previews. |
+| `app/Http/Controllers/SaveLiveEventController.php` | Imports a selected Ticketmaster event and venue, saves available artwork, and adds the event to My gigs. |
+| `app/Http/Controllers/DiscoveryController.php` | Handles bulk import of Ticketmaster listings. |
+| `app/Http/Controllers/EventController.php` | Displays saved listings and individual saved event pages. |
+| `app/Http/Controllers/AuthController.php` | Handles registration, sign-in, and sign-out. |
+| `app/Http/Controllers/MyGigController.php` | Displays the signed-in user's gig diary. |
+| `app/Http/Controllers/AttendanceController.php` | Saves attendance status and returns updated attendance information. |
+| `app/Http/Controllers/SearchSuggestionController.php` | Returns autocomplete matches from upcoming saved events. |
+| `app/Http/Controllers/CommentController.php` | Lists event comments and handles posting, editing, and deleting them. |
+| `app/Http/Controllers/ReviewController.php` | Creates, updates, and deletes event reviews. |
+| `app/Http/Controllers/TicketPhotoController.php` | Validates, stores, and serves private event photos after checking ownership. |
+| `app/Services/TicketmasterService.php` | Sends server-side search and event-detail requests to Ticketmaster and caches responses. |
+| `app/Providers/AppServiceProvider.php` | Configures application services, including rate limits for comment actions. |
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Models and database
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+| File | What it does |
+| --- | --- |
+| `app/Models/User.php` | Represents a registered user. |
+| `app/Models/Event.php` | Represents a gig and links it to its venue, attendance records, comments, and reviews. |
+| `app/Models/Venue.php` | Stores venue information, including coordinates, country, and timezone. |
+| `app/Models/Attendance.php` | Connects a user to an event and stores their attendance status and private photo path. |
+| `app/Models/Comment.php` | Represents a comment posted by a user on an event. |
+| `app/Models/Review.php` | Represents a user's event rating and review text. |
+| `database/migrations/` | Builds the database schema and adds later changes such as Ticketmaster IDs, comments, indexes, and artwork URLs. |
+| `database/seeders/GigPulseSeeder.php` | Adds sample gig data for local testing. |
 
-## Agentic Development
+### Templates and browser scripts
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+| File | What it does |
+| --- | --- |
+| `resources/views/live-events/index.blade.php` | Renders Discover, search filters, and Ticketmaster results. |
+| `resources/views/live-events/show.blade.php` | Renders an event preview visitors can open before saving. |
+| `resources/views/events/index.blade.php` | Lists events saved in the GigPulse database. |
+| `resources/views/events/show.blade.php` | Displays a saved event, its artwork, attendance controls, and the photo, comments, and review sections. |
+| `resources/views/events/camera.blade.php` | Provides camera preview and capture controls for an event photo. |
+| `resources/views/events/comments.blade.php` | Renders comments and uses Fetch to submit changes and poll for updates. |
+| `resources/views/events/reviews.blade.php` | Renders the review list and Fetch-powered review controls. |
+| `resources/views/my-gigs/index.blade.php` | Shows the signed-in user's saved events. |
+| `resources/views/auth/login.blade.php` and `register.blade.php` | Render the sign-in and registration forms. |
+| `resources/views/partials/header.blade.php` | Provides shared navigation and the responsive menu. |
+| `public/js/near-me.js` | Requests browser geolocation and submits a nearby search. |
+| `public/js/search-preferences.js` | Saves and restores Discover filters using localStorage. |
+| `public/js/search-suggestions.js` | Fetches and displays search suggestions as the user types. |
 
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
-```
-
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Coursework verification tasks are tracked in GitHub Issues under the **v1.0 — Coursework demonstration** milestone.
