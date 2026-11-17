@@ -1,14 +1,42 @@
 # GigPulse
 
-GigPulse is a live music discovery and gig diary web app. Search Ticketmaster listings by artist, city, or country, preview an event from Discover, and sign in to save it to **My gigs**.
+I built GigPulse for my full-stack development coursework. I wanted a place where I could look for live music, check the details of a gig, and save it to a personal list.
 
-## Features
+## What I built
 
-- Browse Ticketmaster events, view available artwork and venue details, and follow ticket links.
-- Use **Near me** to search for gigs within 10 miles. Restore your previous Discover filters with **Use last search**.
-- Track attendance, write reviews, and post event comments. Search suggestions, attendance, comments, and reviews use JavaScript Fetch to update the page. Comments refresh periodically.
-- Capture or upload a ticket stub or concert photo. Saved photos are private to the account that uploaded them.
-- Browse on a phone using the responsive layout and collapsible navigation.
+- **Discover** searches Ticketmaster by artist, city, or country. I can click a result to see the event details before signing in.
+- **My gigs** keeps the events I save and lets me track whether I plan to go.
+- **Near me** uses my location to search within 10 miles. **Use last search** brings back my previous filters.
+- On a saved gig I can post comments, leave a review, and take or upload a photo. The photo is private to my account.
+- I used JavaScript Fetch for search suggestions, attendance, comments, and reviews so those parts of the page can update without a full reload. I used CSS media queries to make the layout fit a phone screen.
+
+
+## How GigPulse works
+
+### Finding and saving a gig
+
+I built Discover around the Ticketmaster Discovery API. You can start with an artist, city, or country, or browse the results page by page. Clicking a title opens a preview with the date, venue, listing status, and artwork when Ticketmaster provides it. The ticket link takes you to Ticketmaster.
+
+Visitors can browse public previews before signing in. When a signed-in user chooses **Save to GigPulse**, Laravel imports the selected listing and venue and adds it to **My gigs**. That gives users a place to track their plans and find the event again. The public preview and saved event page have separate URLs.
+
+### What I can do on a saved event
+
+I can set my attendance to **Interested**, **Attending**, or **Went**. The page shows how many people are going. Event comments let people discuss the gig, and reviews let signed-in users share a rating and write about it once the event has started. Users can edit or delete their own comments and reviews.
+
+The photo section lets me upload an existing picture or capture one with the camera. It accepts JPEG, PNG, or WebP files up to 5 MB. Saving another photo replaces the previous one. GigPulse checks that the signed-in user owns the photo before serving it.
+
+### What works on mobile
+
+I used CSS media queries so the layout adapts automatically and the navigation can collapse into a menu. **Near me** asks the browser for permission to use the user's location. **Use last search** restores filters from localStorage in the same browser. The camera feature asks for permission before opening a live preview. A trusted HTTPS address is needed to test live camera access and geolocation from a phone over the network.
+
+### How the code fits together
+
+I used Laravel's MVC structure. Routes send requests to controllers, Eloquent models handle database records and relationships, and Blade templates render the pages. MySQL or MariaDB stores users, venues, events, attendance, comments, and reviews. Laravel migrations define the tables and relationships.
+
+I put the Ticketmaster requests in a separate PHP service. The service caches API responses, and Laravel reads the API key from the local environment. Search autocomplete uses upcoming events already saved in GigPulse. Submitting the Discover form searches Ticketmaster itself.
+
+I used JavaScript Fetch for autocomplete, attendance, comments, and reviews. Comments also check for new messages in the background, so users can see updates without reloading the event page.
+
 
 ## Run locally
 
@@ -53,13 +81,13 @@ You need PHP 8.4.1 or later with PDO MySQL enabled, Composer, and MySQL or Maria
 
 To add sample events to a development database, run `php artisan db:seed --class=GigPulseSeeder`.
 
-## Coursework demo
+## What I show in my demo
 
 1. Search on Discover and click an event title to open its public preview. Sign in and save an event, then reopen it from **My gigs**.
 2. On a saved event, change attendance or post a comment. In Firefox DevTools, use **Network → XHR** to see the Fetch requests. Open the event in a second tab to demonstrate automatic comment refresh.
 3. Show the mobile menu, restore a previous search, run **Near me**, and capture and save a photo. Use localhost on the PC or a trusted HTTPS address on a phone for geolocation and live camera access.
 
-## Project structure
+## Where to find things in the project
 
 ```text
 GigPulse/
@@ -82,7 +110,7 @@ GigPulse/
 └── tests/                   # Laravel feature and unit test suites
 ```
 
-### Routes, controllers, and services
+### What handles each request
 
 | File | What it does |
 | --- | --- |
@@ -103,7 +131,7 @@ GigPulse/
 | `app/Services/TicketmasterService.php` | Sends server-side search and event-detail requests to Ticketmaster and caches responses. |
 | `app/Providers/AppServiceProvider.php` | Configures application services, including rate limits for comment actions. |
 
-### Models and database
+### Where the data is stored
 
 | File | What it does |
 | --- | --- |
@@ -116,7 +144,7 @@ GigPulse/
 | `database/migrations/` | Builds the database schema and adds later changes such as Ticketmaster IDs, comments, indexes, and artwork URLs. |
 | `database/seeders/GigPulseSeeder.php` | Adds sample gig data for local testing. |
 
-### Templates and browser scripts
+### What displays on each page
 
 | File | What it does |
 | --- | --- |
@@ -134,4 +162,4 @@ GigPulse/
 | `public/js/search-preferences.js` | Saves and restores Discover filters using localStorage. |
 | `public/js/search-suggestions.js` | Fetches and displays search suggestions as the user types. |
 
-Coursework verification tasks are tracked in GitHub Issues under the **v1.0 — Coursework demonstration** milestone.
+I used GitHub Issues and the **v1.0 — Coursework demonstration** milestone to track what I needed to check for the demo.
