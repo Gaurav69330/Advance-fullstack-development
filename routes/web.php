@@ -23,6 +23,11 @@ Route::get('/live-events', [LiveEventController::class, 'index'])
     ->middleware('throttle:30,1')
     ->name('live-events.index');
 
+Route::get('/live-events/{ticketmasterId}', [LiveEventController::class, 'show'])
+    ->where('ticketmasterId', '[A-Za-z0-9_-]{1,100}')
+    ->middleware('throttle:30,1')
+    ->name('live-events.show');
+
 // Autocomplete suggestions from saved upcoming events.
 Route::get(
     '/search-suggestions',
